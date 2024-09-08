@@ -1,3 +1,4 @@
+portaudio19-dev
 Flask
 Flask-Cors
 joblib
