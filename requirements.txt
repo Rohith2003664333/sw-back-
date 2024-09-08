@@ -5,7 +5,7 @@ numpy
 librosa
 scipy
 scikit-learn
-pyaudio
+sounddevice
 soundfile
 pandas
 gunicorn
