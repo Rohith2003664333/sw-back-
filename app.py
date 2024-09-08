@@ -94,29 +94,34 @@ def noise_reduction(audio):
 @app.route('/start_recording', methods=['POST'])
 def start_recording():
     # Start audio recording
-    audio = record_audio()
-    audio = noise_reduction(audio)
-    sf.write('sample.wav', audio, 44100)
+    try:
+        audio = record_audio()
+        audio = noise_reduction(audio)
+        sf.write('sample.wav', audio, 44100)
 
-    # Extract features
-    features = extract_features(audio, 44100, n_segments=10)
-    x = features
+        # Extract features
+        features = extract_features(audio, 44100, n_segments=10)
+        x = features
 
-    # Standardize features
-    scaler = StandardScaler()
-    x_scaled = scaler.fit_transform(x)
+        # Standardize features
+        scaler = StandardScaler()
+        x_scaled = scaler.fit_transform(x)
 
-    # Perform hierarchical clustering
-    clusters = sch.linkage(x_scaled, method='ward')
-    max_d = 15  # Distance threshold for clustering
-    cluster_labels = sch.fcluster(clusters, max_d, criterion='distance')
+        # Perform hierarchical clustering
+        clusters = sch.linkage(x_scaled, method='ward')
+        max_d = 15  # Distance threshold for clustering
+        cluster_labels = sch.fcluster(clusters, max_d, criterion='distance')
 
-    # Estimate the number of people
-    num_people = len(np.unique(cluster_labels))
-    print(f"Estimated number of people: {num_people}")
+        # Estimate the number of people
+        num_people = len(np.unique(cluster_labels))
+        print(f"Estimated number of people: {num_people}")
 
-    # Return number of people to the frontend
-    return jsonify({'num_people': num_people})
+        # Return number of people to the frontend
+        return jsonify({'num_people': num_people})
 
+    except Exception as e:
+        print(f"Error occurred: {e}")
+        return jsonify({'error': 'An error occurred while processing the recording.'}), 500
+   
 if __name__ == '__main__':
     app.run(debug=True)
