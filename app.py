@@ -5,8 +5,8 @@ import numpy as np
 import librosa
 import scipy.cluster.hierarchy as sch
 from sklearn.preprocessing import StandardScaler
-import sounddevice as sd
-import soundfile as sf
+import pyaudio
+import wave
 import pandas as pd
 
 # Load the pre-trained model
@@ -49,57 +49,94 @@ def emergency():
 
 @app.route('/getCrimeAlert', methods=['GET'])
 def get_crime_alert():
-    city = request.args.get('city', '').lower()
+    city = request.args.get('city')
     crime_alert = 'low'  # Default value
-    for _, row in df2.iterrows():
-        if city in row['registeration_circles'].lower():
-            crime_alert = row['indicator']
+    for i in range(len(df2)):
+        if city.lower() in df2['registeration_circles'][i].lower():
+            crime_alert = df2['indicator'][i]
             break
     return jsonify({'alert': crime_alert})
 
 def record_audio(duration=20, sample_rate=44100):
-    """Record audio for a given duration."""
-    print("🎙️ Recording...")
-    audio = sd.rec(int(duration * sample_rate), samplerate=sample_rate, channels=1, dtype='float32')
-    sd.wait()
-    print("🎤 Recording completed.")
-    return audio
+    """Record audio for a given duration using PyAudio."""
+    chunk = 1024  # Record in chunks
+    channels = 1  # Mono
+    format = pyaudio.paInt16  # Format for pyaudio
 
-def extract_features(audio, sample_rate, n_segments=10):
+    p = pyaudio.PyAudio()
+
+    stream = p.open(format=format,
+                    channels=channels,
+                    rate=sample_rate,
+                    input=True,
+                    frames_per_buffer=chunk)
+
+    print("🎙️ Recording...")
+
+    frames = []
+
+    for i in range(0, int(sample_rate / chunk * duration)):
+        data = stream.read(chunk)
+        frames.append(data)
+
+    print("🎤 Recording completed.")
+
+    # Stop and close the stream
+    stream.stop_stream()
+    stream.close()
+    p.terminate()
+
+    # Save the recorded data to a WAV file
+    wf = wave.open("sample.wav", 'wb')
+    wf.setnchannels(channels)
+    wf.setsampwidth(p.get_sample_size(format))
+    wf.setframerate(sample_rate)
+    wf.writeframes(b''.join(frames))
+    wf.close()
+
+    # Return the recorded audio data
+    return "sample.wav"
+
+def extract_features(audio_file, sample_rate, n_segments=10):
     """Extract MFCC features from segmented audio."""
+    audio, _ = librosa.load(audio_file, sr=sample_rate)
     segment_length = int(len(audio) / n_segments)
     mfcc_features = []
-    
+
     for i in range(n_segments):
         start = i * segment_length
         end = start + segment_length
         segment = audio[start:end]
-        
+
         # Extract MFCC features
-        mfccs = librosa.feature.mfcc(y=segment.flatten(), sr=sample_rate, n_mfcc=40)
+        mfccs = librosa.feature.mfcc(y=segment, sr=sample_rate, n_mfcc=40)
         mfcc_mean = np.mean(mfccs.T, axis=0)
         test = mfcc_mean.reshape(1, -1)
         k = list(model.predict(test))
-        
+
         if k[0] == 1:  # Check for human sound classification
             mfcc_features.append(mfcc_mean)
-    
+
     return np.array(mfcc_features)
 
 # Noise reduction
 def noise_reduction(audio):
     """Apply basic noise reduction."""
-    return librosa.effects.preemphasis(audio.flatten())
+    return librosa.effects.preemphasis(audio)
 
 @app.route('/start_recording', methods=['POST'])
 def start_recording():
     # Start audio recording
-    audio = record_audio()
+    audio_file = record_audio()
+
+    # Load the saved WAV file
+    audio, sample_rate = librosa.load(audio_file, sr=None)
+    
+    # Apply noise reduction
     audio = noise_reduction(audio)
-    sf.write('sample.wav', audio, 44100)
 
     # Extract features
-    features = extract_features(audio, 44100, n_segments=10)
+    features = extract_features(audio_file, sample_rate, n_segments=10)
     x = features
 
     # Standardize features
@@ -115,8 +152,8 @@ def start_recording():
     num_people = len(np.unique(cluster_labels))
     print(f"Estimated number of people: {num_people}")
 
-    # Return number of people to the frontend
+    # Return the number of people to the frontend
     return jsonify({'num_people': num_people})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5050,debug=True)
+    app.run(debug=True)
