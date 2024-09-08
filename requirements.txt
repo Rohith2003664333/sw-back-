@@ -9,4 +9,4 @@ sounddevice
 soundfile
 pandas
 gunicorn
-portaudio19-dev
+
