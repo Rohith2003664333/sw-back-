@@ -1,8 +1,11 @@
-pyaudio
-Flask
-librosa
-scikit-learn
-soundfile
+flask
+flask-cors
 joblib
-pandas
 numpy
+librosa
+scipy
+scikit-learn
+pyaudio
+soundfile
+pandas
+gunicorn
