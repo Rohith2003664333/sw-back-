@@ -8,6 +8,20 @@ from sklearn.preprocessing import StandardScaler
 import sounddevice as sd
 import soundfile as sf
 import pandas as pd
+from werkzeug.utils import secure_filename
+import os
+import logging
+import math
+
+cls = joblib.load('police_up.pkl')
+en = joblib.load('label_encoder_up.pkl')  
+
+df1=pd.read_csv('Sih_police_station_data.csv')
+
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Load the pre-trained model
 model = joblib.load('human_vs_animal.pkl')
@@ -31,6 +45,76 @@ df2['indicator'] = df2['total_crime_against_women'].apply(crime_indicator)
 app = Flask(__name__)
 CORS(app)
 
+app.config['UPLOAD_FOLDER'] = 'uploads'
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/emergency_contacts')
+def emergency_contacts():
+    return render_template('emergency_contacts.html')
+
+@app.route('/about')
+def about():
+    return render_template('about.html')
+
+
+@app.route('/nearestPoliceStation', methods=['POST'])
+def nearest_police_station():
+    data = request.get_json()
+    latitude = data.get('latitude')
+    longitude = data.get('longitude')
+
+    # Predict the nearest police station using the trained model
+    try:
+        nearest_police_station.nearest_station = en.inverse_transform(cls.predict([[latitude, longitude]]))
+        contact_number = df1.loc[df1['Police_station_name'].str.contains(nearest_police_station.nearest_station[0], case=False, na=False), 'phone_number'].values[0]
+        n = contact_number.replace('-', '')  # Clean number
+        return jsonify({
+            'police_station': nearest_police_station.nearest_station[0],
+            'contact_number': n  # Ensure you return the cleaned number
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+
+@app.route('/distanceP', methods=['POST'])
+def distance_p():
+    data = request.get_json()
+    lat1 = data.get('latitude')
+    lon1 = data.get('longitude')
+    nearest_station = en.inverse_transform(cls.predict([[lat1, lon1]]))[0]
+    lat1=float(lat1)
+    lon1=float(lon1)
+
+    # Get the nearest station name and location
+    
+    station_data = df1[df1['Police_station_name'].str.contains(nearest_station, case=False, na=False)]
+
+    lat2 = station_data['latitude'].values[0]
+    lon2 = station_data['longitude'].values[0]
+
+    lat1, lon1 = math.radians(lat1), math.radians(lon1)
+    lat2, lon2 = math.radians(lat2), math.radians(lon2)
+
+    # Haversine formula
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+
+    a = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+    R = 6371000  # Earth's radius in meters
+    distance = (R * c)/1000
+    distance = round(distance,2)
+
+    return jsonify({'police_distance': distance})
+
+    
+
+              
 @app.route('/')
 def home():
     return render_template('index.html')
@@ -43,85 +127,19 @@ def emergency():
     address = data.get('address')
     
     # Log received location and address
-    print(f'Received emergency location: Latitude {latitude}, Longitude {longitude}, Address {address}')
+    logger.info(f'Received emergency location: Latitude {latitude}, Longitude {longitude}, Address {address}')
     
     return jsonify({'status': 'success', 'latitude': latitude, 'longitude': longitude, 'address': address})
 
 @app.route('/getCrimeAlert', methods=['GET'])
 def get_crime_alert():
-    city = request.args.get('city', '').lower()
+    city = request.args.get('city')
     crime_alert = 'low'  # Default value
-    for _, row in df2.iterrows():
-        if city in row['registeration_circles'].lower():
-            crime_alert = row['indicator']
+    for i in range(len(df2)):
+        if city.lower() in df2['registeration_circles'][i].lower():
+            crime_alert = df2['indicator'][i]
             break
     return jsonify({'alert': crime_alert})
 
-def record_audio(duration=20, sample_rate=44100):
-    """Record audio for a given duration."""
-    print("🎙️ Recording...")
-    audio = sd.rec(int(duration * sample_rate), samplerate=sample_rate, channels=1, dtype='float32')
-    sd.wait()
-    print("🎤 Recording completed.")
-    return audio
-
-def extract_features(audio, sample_rate, n_segments=10):
-    """Extract MFCC features from segmented audio."""
-    segment_length = int(len(audio) / n_segments)
-    mfcc_features = []
-    
-    for i in range(n_segments):
-        start = i * segment_length
-        end = start + segment_length
-        segment = audio[start:end]
-        
-        # Extract MFCC features
-        mfccs = librosa.feature.mfcc(y=segment.flatten(), sr=sample_rate, n_mfcc=40)
-        mfcc_mean = np.mean(mfccs.T, axis=0)
-        test = mfcc_mean.reshape(1, -1)
-        k = list(model.predict(test))
-        
-        if k[0] == 1:  # Check for human sound classification
-            mfcc_features.append(mfcc_mean)
-    
-    return np.array(mfcc_features)
-
-# Noise reduction
-def noise_reduction(audio):
-    """Apply basic noise reduction."""
-    return librosa.effects.preemphasis(audio.flatten())
-
-@app.route('/start_recording', methods=['POST'])
-def start_recording():
-    # Start audio recording
-    try:
-        audio = record_audio()
-        audio = noise_reduction(audio)
-        sf.write('sample.wav', audio, 44100)
-
-        # Extract features
-        features = extract_features(audio, 44100, n_segments=10)
-        x = features
-
-        # Standardize features
-        scaler = StandardScaler()
-        x_scaled = scaler.fit_transform(x)
-
-        # Perform hierarchical clustering
-        clusters = sch.linkage(x_scaled, method='ward')
-        max_d = 15  # Distance threshold for clustering
-        cluster_labels = sch.fcluster(clusters, max_d, criterion='distance')
-
-        # Estimate the number of people
-        num_people = len(np.unique(cluster_labels))
-        print(f"Estimated number of people: {num_people}")
-
-        # Return number of people to the frontend
-        return jsonify({'num_people': num_people})
-
-    except Exception as e:
-        print(f"Error occurred: {e}")
-        return jsonify({'error': 'An error occurred while processing the recording.'}), 500
-   
 if __name__ == '__main__':
     app.run(debug=True)
