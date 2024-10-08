@@ -124,7 +124,7 @@ def register():
         # Check if email already exists
         if users_collection.find_one({'email': email}):
             flash('Email already exists! Please log in.')
-            return redirect('/')
+            return redirect(url_for('login'))
 
         # Insert new user into MongoDB
         users_collection.insert_one({
@@ -143,7 +143,7 @@ def register():
 
 
 # Login route
-@app.route('/', methods=['GET', 'POST'])
+@app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         email = request.form['email']
@@ -154,21 +154,22 @@ def login():
 
         if user and password == user['password']:
             session['username'] = user['username']
-            session['mobile']=user['mobile']
+            session['mobile'] = user['mobile']
             flash('Login successful!')
-            return redirect(url_for('index'))  # Redirect to home after login
+            return redirect(url_for('home'))  # Redirect to home after login
         else:
             flash('Invalid credentials! Please try again.')
-            return redirect(url_for('/'))
+            return redirect(url_for('login'))
     
     return render_template('login.html')
+
 
 # Logout route to clear the session
 @app.route('/logout', methods=['POST', 'GET'])  # Specify allowed methods
 def logout():
     session.clear()  # Clear the session
     flash('You have been logged out.')
-    return redirect(url_for('index')) 
+    return redirect(url_for('login')) 
 
 @app.route('/')
 def index():
