@@ -171,9 +171,9 @@ def logout():
     flash('You have been logged out.')
     return redirect(url_for('login')) 
 
-@app.route('/')
-def index():
-    return render_template('index.html')
+# @app.route('/')
+#def index():
+    #return render_template('index.html')
 
 @app.route('/emergency_contacts')
 def emergency_contacts():
