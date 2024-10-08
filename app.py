@@ -156,7 +156,7 @@ def login():
             session['username'] = user['username']
             session['mobile'] = user['mobile']
             flash('Login successful!')
-            return redirect(url_for('home'))  # Redirect to home after login
+            return redirect('home')  # Redirect to home after login
         else:
             flash('Invalid credentials! Please try again.')
             return redirect(url_for('login'))
