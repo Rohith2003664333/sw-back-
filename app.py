@@ -156,12 +156,13 @@ def login():
             session['username'] = user['username']
             session['mobile'] = user['mobile']
             flash('Login successful!')
-            return redirect(url_for('index'))  # Redirect to home after login
+            return redirect(url_for('index'))  # Make sure the 'index' route is correctly defined
         else:
             flash('Invalid credentials! Please try again.')
-            return redirect(url_for('login'))
-    
+            return redirect(url_for('login'))  # Corrected to 'login' instead of '/'
+
     return render_template('login.html')
+
 
 
 # Logout route to clear the session
@@ -171,9 +172,9 @@ def logout():
     flash('You have been logged out.')
     return redirect(url_for('login')) 
 
-# @app.route('/')
-#def index():
-    #return render_template('index.html')
+ @app.route('/index')
+def index():
+    return render_template('index.html')
 
 @app.route('/emergency_contacts')
 def emergency_contacts():
