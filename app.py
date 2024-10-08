@@ -156,10 +156,10 @@ def login():
             session['username'] = user['username']
             session['mobile']=user['mobile']
             flash('Login successful!')
-            return redirect('https://sw-back-8.onrender.com/index')  # Redirect to home after login
+            return redirect(url_for('index'))  # Redirect to home after login
         else:
             flash('Invalid credentials! Please try again.')
-            return redirect('https://sw-back-8.onrender.com/')
+            return redirect(url_for('/'))
     
     return render_template('login.html')
 
