@@ -100,7 +100,7 @@ def send_sos():
 
 # Home page route
 @app.route('/index')
-def home():
+def index():
     
     username = session.get('username', 'Guest')
     return render_template('index.html',username=username)
