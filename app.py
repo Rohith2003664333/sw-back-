@@ -99,11 +99,11 @@ def send_sos():
     return jsonify({"status": "SOS sent!"})
 
 # Home page route
-@app.route('/index')
-def home():
+#@app.route('/index')
+#def home():
     
-    username = session.get('username', 'Guest')
-    return render_template('index.html',username=username)
+    #username = session.get('username', 'Guest')
+    #return render_template('index.html',username=username)
 
 
 
@@ -172,7 +172,7 @@ def logout():
     flash('You have been logged out.')
     return redirect(url_for('login')) 
 
- @app.route('/index')
+@app.route('/index')
 def index():
     return render_template('index.html')
 
