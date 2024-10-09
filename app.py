@@ -168,9 +168,9 @@ def logout():
     flash('You have been logged out.')
     return redirect(url_for('index')) 
 
-#@app.route('/')
-#def index():
-    #return render_template('index.html')
+@app.route('/')
+def index():
+    return render_template('index.html')
 
 @app.route('/emergency_contacts')
 def emergency_contacts():
@@ -260,4 +260,5 @@ def get_crime_alert():
     return jsonify({'alert': crime_alert})
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
