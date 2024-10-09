@@ -16,6 +16,7 @@ import soundfile as sf
 
 
 
+
 cls = joblib.load('police_up.pkl')
 en = joblib.load('label_encoder_up.pkl')  
 
@@ -98,11 +99,11 @@ def send_sos():
     return jsonify({"status": "SOS sent!"})
 
 # Home page route
-#@app.route('/index')
-#def home():
+@app.route('/index')
+def home():
     
-    #username = session.get('username', 'Guest')
-    #return render_template('index.html',username=username)
+    username = session.get('username', 'Guest')
+    return render_template('index.html',username=username)
 
 
 
@@ -123,7 +124,7 @@ def register():
         # Check if email already exists
         if users_collection.find_one({'email': email}):
             flash('Email already exists! Please log in.')
-            return redirect(url_for('login'))
+            return redirect('/login')
 
         # Insert new user into MongoDB
         users_collection.insert_one({
@@ -135,7 +136,7 @@ def register():
         })
 
         flash('Registration successful! Please log in.')
-        return redirect('/')
+        return redirect('/login')
 
     return render_template('registration.html')
 
@@ -153,30 +154,25 @@ def login():
 
         if user and password == user['password']:
             session['username'] = user['username']
-            session['mobile'] = user['mobile']
+            session['mobile']=user['mobile']
             flash('Login successful!')
-            # Send a success response to the Android WebView
-            return jsonify({'status': 'success', 'message': 'Login successful!'})
+            return redirect('index') # Redirect to home after login
         else:
             flash('Invalid credentials! Please try again.')
-            return jsonify({'status': 'failure', 'message': 'Invalid credentials!'})
+            return redirect('/login')
     
     return render_template('login.html')
-
-
 
 # Logout route to clear the session
 @app.route('/logout', methods=['POST', 'GET'])  # Specify allowed methods
 def logout():
     session.clear()  # Clear the session
     flash('You have been logged out.')
-    return redirect(url_for('login')) 
+    return redirect(url_for('index')) 
 
-@app.route('/index')
+@app.route('/')
 def index():
-    username = session.get('username', 'Guest')
-    return render_template('index.html',username=username)
-    #return render_template('index.html')
+    return render_template('index.html')
 
 @app.route('/emergency_contacts')
 def emergency_contacts():
