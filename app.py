@@ -155,7 +155,7 @@ def login():
             session['username'] = user['username']
             session['mobile'] = user['mobile']
             # Send success response along with the username
-            return jsonify({'success': True})
+            return jsonify({'success': True, 'username': user['username']})
             #, 'username': user['username']
         else:
             return jsonify({'success': False, 'message': 'Invalid credentials!'})
@@ -261,4 +261,5 @@ def get_crime_alert():
     return jsonify({'alert': crime_alert})
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
