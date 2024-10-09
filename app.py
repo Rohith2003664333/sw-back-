@@ -100,7 +100,7 @@ def send_sos():
 
 # Home page route
 @app.route('/index')
-def home():
+def index():
     
     username = session.get('username', 'Guest')
     return render_template('index.html',username=username)
@@ -169,9 +169,9 @@ def logout():
     flash('You have been logged out.')
     return redirect(url_for('index')) 
 
-@app.route('/')
-def index():
-    return render_template('index.html')
+#@app.route('/')
+#def index():
+   # return render_template('index.html')
 
 @app.route('/emergency_contacts')
 def emergency_contacts():
