@@ -260,4 +260,4 @@ def get_crime_alert():
     return jsonify({'alert': crime_alert})
 
 if __name__ == '__main__':
-    app.run(debug=False)
+    app.run(debug=True)
