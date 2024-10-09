@@ -16,7 +16,6 @@ import soundfile as sf
 
 
 
-
 cls = joblib.load('police_up.pkl')
 en = joblib.load('label_encoder_up.pkl')  
 
@@ -156,11 +155,12 @@ def login():
             session['username'] = user['username']
             session['mobile'] = user['mobile']
             flash('Login successful!')
-            return redirect(url_for('index'))  # Make sure the 'index' route is correctly defined
+            # Send a success response to the Android WebView
+            return jsonify({'status': 'success', 'message': 'Login successful!'})
         else:
             flash('Invalid credentials! Please try again.')
-            return redirect(url_for('login'))  # Corrected to 'login' instead of '/'
-
+            return jsonify({'status': 'failure', 'message': 'Invalid credentials!'})
+    
     return render_template('login.html')
 
 
@@ -174,7 +174,9 @@ def logout():
 
 @app.route('/index')
 def index():
-    return render_template('index.html')
+    username = session.get('username', 'Guest')
+    return render_template('index.html',username=username)
+    #return render_template('index.html')
 
 @app.route('/emergency_contacts')
 def emergency_contacts():
