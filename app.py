@@ -100,7 +100,7 @@ def send_sos():
 
 # Home page route
 @app.route('/index')
-def index():
+def home():
     
     username = session.get('username', 'Guest')
     return render_template('index.html',username=username)
@@ -124,7 +124,7 @@ def register():
         # Check if email already exists
         if users_collection.find_one({'email': email}):
             flash('Email already exists! Please log in.')
-            return redirect('/login')
+            return redirect('/')
 
         # Insert new user into MongoDB
         users_collection.insert_one({
@@ -136,9 +136,10 @@ def register():
         })
 
         flash('Registration successful! Please log in.')
-        return redirect('/login')
+        return redirect('/')
 
     return render_template('registration.html')
+
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -160,7 +161,6 @@ def login():
             return jsonify({'success': False, 'message': 'Invalid credentials!'})
     
     return render_template('login.html')
-
 
 # Logout route to clear the session
 @app.route('/logout', methods=['POST', 'GET'])  # Specify allowed methods
