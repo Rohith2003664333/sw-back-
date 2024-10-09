@@ -141,8 +141,6 @@ def register():
     return render_template('registration.html')
 
 
-
-# Login route
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -155,13 +153,10 @@ def login():
         if user and password == user['password']:
             session['username'] = user['username']
             session['mobile'] = user['mobile']
-            flash('Login successful!')
-            return jsonify({'redirect': 'index.html'})  # Send redirect instruction
+            return jsonify({'success': True})  # Send success response
         else:
-            flash('Invalid credentials! Please try again.')
-            return redirect('/login')
+            return jsonify({'success': False, 'message': 'Invalid credentials!'})  # Send failure response
 
-    
     return render_template('login.html')
 
 # Logout route to clear the session
