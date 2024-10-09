@@ -153,11 +153,13 @@ def login():
         if user and password == user['password']:
             session['username'] = user['username']
             session['mobile'] = user['mobile']
-            return jsonify({'success': True})  # Send success response
+            # Send success response along with the username
+            return jsonify({'success': True, 'username': user['username']})
         else:
-            return jsonify({'success': False, 'message': 'Invalid credentials!'})  # Send failure response
-
+            return jsonify({'success': False, 'message': 'Invalid credentials!'})
+    
     return render_template('login.html')
+
 
 # Logout route to clear the session
 @app.route('/logout', methods=['POST', 'GET'])  # Specify allowed methods
