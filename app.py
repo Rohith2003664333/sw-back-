@@ -154,12 +154,13 @@ def login():
 
         if user and password == user['password']:
             session['username'] = user['username']
-            session['mobile']=user['mobile']
+            session['mobile'] = user['mobile']
             flash('Login successful!')
-            return redirect('/index') # Redirect to home after login
+            return jsonify({'redirect': 'index.html'})  # Send redirect instruction
         else:
             flash('Invalid credentials! Please try again.')
             return redirect('/login')
+
     
     return render_template('login.html')
 
