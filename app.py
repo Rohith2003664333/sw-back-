@@ -156,7 +156,7 @@ def login():
             session['username'] = user['username']
             session['mobile'] = user['mobile']
             # Send success response along with the username
-            return jsonify({'success': True, 'username': username]})
+            return jsonify({'success': True, 'username': username})
             #, 'username': user['username']
         else:
             return jsonify({'success': False, 'message': 'Invalid credentials!'})
