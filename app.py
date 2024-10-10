@@ -55,10 +55,12 @@ users_collection = db['users']
 messages_collection = db.messages
 
 # Route to render the community page
+# Route to render the community page
 @app.route('/community')
 def community():
     username = session.get('username', 'Guest')
-    return render_template('community.html', username=username)
+    return jsonify({"username": username})
+
 
 # Route to get all messages
 @app.route('/getMessages', methods=['GET'])
