@@ -79,10 +79,18 @@ def get_messages():
 @app.route('/sendMessage', methods=['POST'])
 def send_message():
     data = request.json
-    username = session.get('username', 'Guest')
+    username = data.get('username', session.get('username', 'Guest'))  # Get from data or session
     new_message = {"message": data['message'], "username": username}
     messages_collection.insert_one(new_message)
-    return jsonify({"status": "Message sent!"})
+    return jsonify({"status": "Message sent!", "username": username})
+
+
+@app.route('/getUsername', methods=['GET'])
+def get_username():
+    # Assuming you're using sessions to store the username
+    username = session.get('username', 'Guest')
+    return jsonify({"username": username})
+
 
 # Route to handle SOS messages (triggered when SOS button is pressed)
 @app.route('/sendSOS', methods=['POST'])
