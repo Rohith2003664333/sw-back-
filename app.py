@@ -124,6 +124,7 @@ def register():
         # Check if email already exists
         if users_collection.find_one({'email': email}):
             flash('Email already exists! Please log in.')
+            #return jsonify({'success': True})
             return redirect(url_for('login'))
 
         # Insert new user into MongoDB
@@ -136,7 +137,8 @@ def register():
         })
 
         flash('Registration successful! Please log in.')
-        return redirect(url_for('login'))
+        #return jsonify({'success': True})
+        return redirect('login')
 
     return render_template('registration.html')
 
