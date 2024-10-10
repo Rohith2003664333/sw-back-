@@ -10,7 +10,9 @@ from datetime import timedelta
 
 # Initialize the app and setup CORS
 app = Flask(__name__)
-CORS(app)
+#CORS(app)
+CORS(app, supports_credentials=True)
+
 
 # Secret key for session management
 app.secret_key = os.urandom(24)
@@ -47,12 +49,12 @@ db = client['swaraksha']
 users_collection = db['users']
 messages_collection = db['messages']
 
-# Route to render the community page
 @app.route('/community')
 def community():
-    username = session.get('username', 'Guest')
+    username = session.get('username', 'Guest')  # Get the username from the session
     logger.info(f"Community page accessed by {username}.")
     return jsonify({"username": username})
+
 
 # Route to get all messages
 @app.route('/getMessages', methods=['GET'])
