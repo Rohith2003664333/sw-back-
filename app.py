@@ -148,7 +148,7 @@ def login():
             session['mobile'] = user['mobile']
             session.permanent = True  # Set session as permanent
             logger.info(f"User {user['username']} logged in successfully.")
-            return jsonify({'success': True, 'username': user['username'],'mobile':user['mobile']})
+            return jsonify({'success': True, 'username': user['username']})
         else:
             return jsonify({'success': False, 'message': 'Invalid credentials!'})
 
