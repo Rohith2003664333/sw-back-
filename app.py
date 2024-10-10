@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify,session
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
 from flask_cors import CORS
 import joblib
 import pandas as pd
@@ -13,15 +13,10 @@ from sklearn.preprocessing import StandardScaler
 import sounddevice as sd
 import soundfile as sf
 
-
-
-
-
 cls = joblib.load('police_up.pkl')
-en = joblib.load('label_encoder_up.pkl')  
+en = joblib.load('label_encoder_up.pkl')
 
-df1=pd.read_csv('Sih_police_station_data.csv')
-
+df1 = pd.read_csv('Sih_police_station_data.csv')
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -46,14 +41,12 @@ def crime_indicator(crime_count):
 # Apply classification to crime data
 df2['indicator'] = df2['total_crime_against_women'].apply(crime_indicator)
 
-
 app = Flask(__name__)
 CORS(app)
 app.secret_key = os.urandom(24)  # Ensure this is set for session handling
 
 app.config['UPLOAD_FOLDER'] = 'uploads'
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-
 
 # MongoDB connection
 client = MongoClient("mongodb+srv://rh0665971:q7DFaWad4RKQRiWg@cluster0.gusg4.mongodb.net/?retryWrites=true&w=majority&ssl=true&ssl_cert_reqs=CERT_NONE")
@@ -74,23 +67,19 @@ def get_messages():
     messages_list = [{"message": msg.get('message', ''), "username": msg.get('username', 'Anonymous')} for msg in messages]
     return jsonify({"messages": messages_list})
 
-
 # Route to send a message
 @app.route('/sendMessage', methods=['POST'])
 def send_message():
     data = request.json
-    username =session.get('username', 'Guest')
+    username = session.get('username', 'Guest')
     new_message = {"message": data['message'], "username": username}
     messages_collection.insert_one(new_message)
     return jsonify({"status": "Message sent!"})
 
-
 @app.route('/getUsername', methods=['GET'])
 def get_username():
-    # Assuming you're using sessions to store the username
     username = session.get('username', 'Guest')
     return jsonify({"username": username})
-
 
 # Route to handle SOS messages (triggered when SOS button is pressed)
 @app.route('/sendSOS', methods=['POST'])
@@ -98,30 +87,25 @@ def send_sos():
     data = request.json
     latitude = data['latitude']
     longitude = data['longitude']
-    address=data['address']
+    address = data['address']
     username = session.get('username', 'Guest')
-    mobile = session.get('mobile','Guest')
-    sos_message = f"Emergency! Please help me at (address:{address},Latitude: {latitude}, Longitude: {longitude},mobile:{mobile})"
-    new_message = {"message":sos_message, "username": username}
+    mobile = session.get('mobile', 'Guest')
+    sos_message = f"Emergency! Please help me at (address: {address}, Latitude: {latitude}, Longitude: {longitude}, mobile: {mobile})"
+    new_message = {"message": sos_message, "username": username}
     messages_collection.insert_one(new_message)
     return jsonify({"status": "SOS sent!"})
 
 # Home page route
 @app.route('/index')
 def index():
-    
     username = session.get('username', 'Guest')
-    return render_template('index.html',username=username)
-
-
-
+    return render_template('index.html', username=username)
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
-        # Log request.form to see what data is being sent
-        username = request.form.get('username')  # Use .get() to avoid KeyError
-        mobile=request.form.get('mobile')
+        username = request.form.get('username')
+        mobile = request.form.get('mobile')
         email = request.form.get('email')
         password = request.form.get('password')
 
@@ -132,31 +116,25 @@ def register():
         # Check if email already exists
         if users_collection.find_one({'email': email}):
             flash('Email already exists! Please log in.')
-            message='Email already exists! Please log in.'
-            return jsonify({'success': True,'message':message})
-            #return redirect(url_for('login'))
+            message = 'Email already exists! Please log in.'
+            return jsonify({'success': True, 'message': message})
 
         # Insert new user into MongoDB
         users_collection.insert_one({
             'username': username,
-            'mobile':mobile,
+            'mobile': mobile,
             'email': email,
-
             'password': password  # Plain text for now as requested
         })
 
         flash('Registration successful! Please log in.')
-        message='Registration successful! Please log in.'
-        return jsonify({'success': True,'message':message})
-        #return redirect('login')
+        message = 'Registration successful! Please log in.'
+        return jsonify({'success': True, 'message': message})
 
     return render_template('registration.html')
 
-
-
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    #username = session.get('username', 'Guest')
     if request.method == 'POST':
         email = request.form['email']
         password = request.form['password']
@@ -168,23 +146,18 @@ def login():
             session['username'] = user['username']
             session['mobile'] = user['mobile']
             # Send success response along with the username
-            return jsonify({'success': True,'username': user['username']})
-            #, 'username': user['username']
+            return jsonify({'success': True, 'username': user['username']})
         else:
             return jsonify({'success': False, 'message': 'Invalid credentials!'})
-    
+
     return render_template('login.html')
 
 # Logout route to clear the session
-@app.route('/logout', methods=['POST', 'GET'])  # Specify allowed methods
+@app.route('/logout', methods=['POST', 'GET'])
 def logout():
     session.clear()  # Clear the session
     flash('You have been logged out.')
-    return redirect(url_for('index')) 
-
-#@app.route('/')
-#def index():
-   # return render_template('index.html')
+    return redirect(url_for('index'))
 
 @app.route('/emergency_contacts')
 def emergency_contacts():
@@ -194,7 +167,6 @@ def emergency_contacts():
 def about():
     return render_template('about.html')
 
-
 @app.route('/nearestPoliceStation', methods=['POST'])
 def nearest_police_station():
     data = request.get_json()
@@ -203,16 +175,15 @@ def nearest_police_station():
 
     # Predict the nearest police station using the trained model
     try:
-        nearest_police_station.nearest_station = en.inverse_transform(cls.predict([[latitude, longitude]]))
-        contact_number = df1.loc[df1['Police_station_name'].str.contains(nearest_police_station.nearest_station[0], case=False, na=False), 'phone_number'].values[0]
+        nearest_station = en.inverse_transform(cls.predict([[latitude, longitude]]))
+        contact_number = df1.loc[df1['Police_station_name'].str.contains(nearest_station[0], case=False, na=False), 'phone_number'].values[0]
         n = contact_number.replace('-', '')  # Clean number
         return jsonify({
-            'police_station': nearest_police_station.nearest_station[0],
+            'police_station': nearest_station[0],
             'contact_number': n  # Ensure you return the cleaned number
         })
     except Exception as e:
         return jsonify({'error': str(e)})
-
 
 @app.route('/distanceP', methods=['POST'])
 def distance_p():
@@ -220,11 +191,10 @@ def distance_p():
     lat1 = data.get('latitude')
     lon1 = data.get('longitude')
     nearest_station = en.inverse_transform(cls.predict([[lat1, lon1]]))[0]
-    lat1=float(lat1)
-    lon1=float(lon1)
+    lat1 = float(lat1)
+    lon1 = float(lon1)
 
     # Get the nearest station name and location
-    
     station_data = df1[df1['Police_station_name'].str.contains(nearest_station, case=False, na=False)]
 
     lat2 = station_data['latitude'].values[0]
@@ -241,15 +211,10 @@ def distance_p():
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
     R = 6371000  # Earth's radius in meters
-    distance = (R * c)/1000
-    distance = round(distance,2)
+    distance = (R * c) / 1000
+    distance = round(distance, 2)
 
     return jsonify({'police_distance': distance})
-
-    
-
-              
-
 
 @app.route('/emergency', methods=['POST'])
 def emergency():
@@ -257,10 +222,10 @@ def emergency():
     latitude = data.get('latitude')
     longitude = data.get('longitude')
     address = data.get('address')
-    
+
     # Log received location and address
     logger.info(f'Received emergency location: Latitude {latitude}, Longitude {longitude}, Address {address}')
-    
+
     return jsonify({'status': 'success', 'latitude': latitude, 'longitude': longitude, 'address': address})
 
 @app.route('/getCrimeAlert', methods=['GET'])
