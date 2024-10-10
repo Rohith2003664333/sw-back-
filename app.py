@@ -79,10 +79,10 @@ def get_messages():
 @app.route('/sendMessage', methods=['POST'])
 def send_message():
     data = request.json
-    username = data.get('username', session.get('username', 'Guest'))  # Get from data or session
+    username =session.get('username', 'Guest')
     new_message = {"message": data['message'], "username": username}
     messages_collection.insert_one(new_message)
-    return jsonify({"status": "Message sent!", "username": username})
+    return jsonify({"status": "Message sent!"})
 
 
 @app.route('/getUsername', methods=['GET'])
