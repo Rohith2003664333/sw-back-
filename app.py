@@ -10,9 +10,7 @@ from datetime import timedelta
 
 # Initialize the app and setup CORS
 app = Flask(__name__)
-#CORS(app)
 CORS(app, supports_credentials=True)
-
 
 # Secret key for session management
 app.secret_key = os.urandom(24)
@@ -44,7 +42,7 @@ def crime_indicator(crime_count):
 df2['indicator'] = df2['total_crime_against_women'].apply(crime_indicator)
 
 # MongoDB connection
-client = MongoClient("mongodb+srv://rh0665971:q7DFaWad4RKQRiWg@cluster0.gusg4.mongodb.net/?retryWrites=true&w=majority&ssl=true&ssl_cert_reqs=CERT_NONE")
+client = MongoClient("mongodb+srv://username:password@cluster0.gusg4.mongodb.net/?retryWrites=true&w=majority&ssl=true&ssl_cert_reqs=CERT_NONE")
 db = client['swaraksha']
 users_collection = db['users']
 messages_collection = db['messages']
@@ -54,7 +52,6 @@ def community():
     username = session.get('username', 'Guest')  # Get the username from the session
     logger.info(f"Community page accessed by {username}.")
     return jsonify({"username": username})
-
 
 @app.route('/getMessages', methods=['GET'])
 def get_messages():
@@ -66,8 +63,7 @@ def get_messages():
 @app.route('/sendMessage', methods=['POST'])
 def send_message():
     data = request.json
-    # Retrieve the username directly from the data instead of session
-    username = data.get('username', 'Guest')  # Default to 'Guest' if not provided
+    username = session.get('username', 'Guest')  # Use session data for username
     new_message = {"message": data['message'], "username": username}
     messages_collection.insert_one(new_message)
     logger.info(f"Message sent by {username}: {data['message']}")
@@ -116,7 +112,7 @@ def register():
         # Check if email already exists
         if users_collection.find_one({'email': email}):
             flash('Email already exists! Please log in.')
-            return jsonify({'success': True, 'message': 'Email already exists! Please log in.'})
+            return jsonify({'success': False, 'message': 'Email already exists! Please log in.'})
 
         # Insert new user into MongoDB
         users_collection.insert_one({
