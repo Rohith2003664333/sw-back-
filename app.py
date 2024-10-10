@@ -86,8 +86,10 @@ def send_sos():
     latitude = data['latitude']
     longitude = data['longitude']
     address = data['address']
-    username = session.get('username', 'Guest')
-    mobile = session.get('mobile', 'Guest')
+    #username = session.get('username', 'Guest')
+    username=data['username']
+    mobile=data['mobile']
+    #mobile = session.get('mobile', 'Guest')
     sos_message = f"Emergency! Please help me at (address: {address}, Latitude: {latitude}, Longitude: {longitude}, mobile: {mobile})"
     new_message = {"message": sos_message, "username": username}
     messages_collection.insert_one(new_message)
