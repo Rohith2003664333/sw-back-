@@ -162,24 +162,83 @@ def logout():
     logger.info(f"User {username} logged out.")
     return redirect(url_for('index'))
 
-# Route to find nearest police station using ML model
 @app.route('/nearestPoliceStation', methods=['POST'])
 def nearest_police_station():
     data = request.get_json()
     latitude = data.get('latitude')
     longitude = data.get('longitude')
 
+    # Predict the nearest police station using the trained model
     try:
-        nearest_station = en.inverse_transform(cls.predict([[latitude, longitude]]))
-        contact_number = df1.loc[df1['Police_station_name'].str.contains(nearest_station[0], case=False, na=False), 'phone_number'].values[0]
-        contact_number = contact_number.replace('-', '')  # Clean number
+        nearest_police_station.nearest_station = en.inverse_transform(cls.predict([[latitude, longitude]]))
+        contact_number = df1.loc[df1['Police_station_name'].str.contains(nearest_police_station.nearest_station[0], case=False, na=False), 'phone_number'].values[0]
+        n = contact_number.replace('-', '')  # Clean number
         return jsonify({
-            'police_station': nearest_station[0],
-            'contact_number': contact_number
+            'police_station': nearest_police_station.nearest_station[0],
+            'contact_number': n  # Ensure you return the cleaned number
         })
     except Exception as e:
-        logger.error(f"Error finding nearest police station: {e}")
         return jsonify({'error': str(e)})
+
+
+@app.route('/distanceP', methods=['POST'])
+def distance_p():
+    data = request.get_json()
+    lat1 = data.get('latitude')
+    lon1 = data.get('longitude')
+    nearest_station = en.inverse_transform(cls.predict([[lat1, lon1]]))[0]
+    lat1=float(lat1)
+    lon1=float(lon1)
+
+    # Get the nearest station name and location
+    
+    station_data = df1[df1['Police_station_name'].str.contains(nearest_station, case=False, na=False)]
+
+    lat2 = station_data['latitude'].values[0]
+    lon2 = station_data['longitude'].values[0]
+
+    lat1, lon1 = math.radians(lat1), math.radians(lon1)
+    lat2, lon2 = math.radians(lat2), math.radians(lon2)
+
+    # Haversine formula
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+
+    a = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+    R = 6371000  # Earth's radius in meters
+    distance = (R * c)/1000
+    distance = round(distance,2)
+
+    return jsonify({'police_distance': distance})
+
+    
+
+              
+
+
+@app.route('/emergency', methods=['POST'])
+def emergency():
+    data = request.get_json()
+    latitude = data.get('latitude')
+    longitude = data.get('longitude')
+    address = data.get('address')
+    
+    # Log received location and address
+    logger.info(f'Received emergency location: Latitude {latitude}, Longitude {longitude}, Address {address}')
+    
+    return jsonify({'status': 'success', 'latitude': latitude, 'longitude': longitude, 'address': address})
+
+@app.route('/getCrimeAlert', methods=['GET'])
+def get_crime_alert():
+    city = request.args.get('city')
+    crime_alert = 'low'  # Default value
+    for i in range(len(df2)):
+        if city.lower() in df2['registeration_circles'][i].lower():
+            crime_alert = df2['indicator'][i]
+            break
+    return jsonify({'alert': crime_alert})
 
 # Additional emergency and utility routes (trimmed for brevity)
 
