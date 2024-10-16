@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, send_from_directory
 from flask_cors import CORS
 import joblib
 import pandas as pd
@@ -7,12 +7,11 @@ import math
 from pymongo import MongoClient
 import logging
 from datetime import timedelta
+from werkzeug.utils import secure_filename
 
 # Initialize the app and setup CORS
 app = Flask(__name__)
-#CORS(app)
 CORS(app, supports_credentials=True)
-
 
 # Secret key for session management
 app.secret_key = os.urandom(24)
@@ -49,29 +48,72 @@ db = client['swaraksha']
 users_collection = db['users']
 messages_collection = db['messages']
 
+# Ensure the 'uploads' directory exists
+if not os.path.exists('uploads'):
+    os.makedirs('uploads')
+
 @app.route('/community')
 def community():
     username = session.get('username', 'Guest')  # Get the username from the session
     logger.info(f"Community page accessed by {username}.")
     return jsonify({"username": username})
 
-
 @app.route('/getMessages', methods=['GET'])
 def get_messages():
-    messages = list(messages_collection.find({}, {'_id': 0, 'message': 1, 'username': 1}))
-    messages_list = [{"message": msg.get('message', ''), "username": msg.get('username', 'Anonymous')} for msg in messages]
+    messages = list(messages_collection.find({}, {'_id': 0}))
+    messages_list = []
+    for msg in messages:
+        message_data = {
+            "username": msg.get('username', 'Anonymous'),
+            "type": msg.get('type', 'text'),
+        }
+        if msg.get('type') == 'audio':
+            message_data["filename"] = msg.get('filename')
+        else:
+            message_data["message"] = msg.get('message', '')
+        messages_list.append(message_data)
     return jsonify({"messages": messages_list})
 
-# Route to send a message
+# Route to send a text message
 @app.route('/sendMessage', methods=['POST'])
 def send_message():
     data = request.json
-    # Retrieve the username directly from the data instead of session
     username = data.get('username', 'Guest')  # Default to 'Guest' if not provided
-    new_message = {"message": data['message'], "username": username}
+    new_message = {
+        "message": data['message'],
+        "username": username,
+        "type": "text"
+    }
     messages_collection.insert_one(new_message)
-    logger.info(f"Message sent by {username}: {data['message']}")
+    logger.info(f"Text message sent by {username}: {data['message']}")
     return jsonify({"status": "Message sent!"})
+
+# Route to send a voice message
+@app.route('/sendVoiceMessage', methods=['POST'])
+def send_voice_message():
+    username = request.form.get('username', 'Guest')
+    if 'voiceMessage' not in request.files:
+        return jsonify({"error": "No voice message provided"}), 400
+
+    voice_file = request.files['voiceMessage']
+    filename = secure_filename(voice_file.filename)
+    filepath = os.path.join('uploads', filename)
+    voice_file.save(filepath)
+
+    # Store the file reference in MongoDB
+    new_message = {
+        "username": username,
+        "type": "audio",
+        "filename": filename
+    }
+    messages_collection.insert_one(new_message)
+    logger.info(f"Voice message sent by {username}: {filename}")
+    return jsonify({"status": "Voice message sent!"})
+
+# Route to serve uploaded audio files
+@app.route('/uploads/<filename>')
+def uploaded_file(filename):
+    return send_from_directory('uploads', filename)
 
 # Route to get the username from the session
 @app.route('/getUsername', methods=['GET'])
@@ -86,12 +128,14 @@ def send_sos():
     latitude = data['latitude']
     longitude = data['longitude']
     address = data['address']
-    #username = session.get('username', 'Guest')
-    username=data['username']
-    mobile=data['mobile']
-    #mobile = session.get('mobile', 'Guest')
+    username = data['username']
+    mobile = data['mobile']
     sos_message = f"Emergency! Please help me at (address: {address}, Latitude: {latitude}, Longitude: {longitude}, mobile: {mobile})"
-    new_message = {"message": sos_message, "username": username}
+    new_message = {
+        "message": sos_message,
+        "username": username,
+        "type": "text"
+    }
     messages_collection.insert_one(new_message)
     logger.info(f"SOS message sent by {username}: {sos_message}")
     return jsonify({"status": "SOS sent!"})
@@ -148,7 +192,7 @@ def login():
             session['mobile'] = user['mobile']
             session.permanent = True  # Set session as permanent
             logger.info(f"User {user['username']} logged in successfully.")
-            return jsonify({'success': True, 'username': user['username'],'mobile':user['mobile']})
+            return jsonify({'success': True, 'username': user['username'], 'mobile': user['mobile']})
         else:
             return jsonify({'success': False, 'message': 'Invalid credentials!'})
 
@@ -180,18 +224,16 @@ def nearest_police_station():
     except Exception as e:
         return jsonify({'error': str(e)})
 
-
 @app.route('/distanceP', methods=['POST'])
 def distance_p():
     data = request.get_json()
     lat1 = data.get('latitude')
     lon1 = data.get('longitude')
     nearest_station = en.inverse_transform(cls.predict([[lat1, lon1]]))[0]
-    lat1=float(lat1)
-    lon1=float(lon1)
+    lat1 = float(lat1)
+    lon1 = float(lon1)
 
     # Get the nearest station name and location
-    
     station_data = df1[df1['Police_station_name'].str.contains(nearest_station, case=False, na=False)]
 
     lat2 = station_data['latitude'].values[0]
@@ -208,15 +250,10 @@ def distance_p():
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
     R = 6371000  # Earth's radius in meters
-    distance = (R * c)/1000
-    distance = round(distance,2)
+    distance = (R * c) / 1000
+    distance = round(distance, 2)
 
     return jsonify({'police_distance': distance})
-
-    
-
-              
-
 
 @app.route('/emergency', methods=['POST'])
 def emergency():
@@ -224,10 +261,10 @@ def emergency():
     latitude = data.get('latitude')
     longitude = data.get('longitude')
     address = data.get('address')
-    
+
     # Log received location and address
     logger.info(f'Received emergency location: Latitude {latitude}, Longitude {longitude}, Address {address}')
-    
+
     return jsonify({'status': 'success', 'latitude': latitude, 'longitude': longitude, 'address': address})
 
 @app.route('/getCrimeAlert', methods=['GET'])
