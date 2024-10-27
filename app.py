@@ -14,6 +14,9 @@ from tensorflow.keras.models import load_model  # type: ignore
 import gc
 import tensorflow as tf
 
+from io import BytesIO
+import base64
+
 # Initialize the app and setup CORS
 app = Flask(__name__)
 CORS(app, supports_credentials=True)
@@ -245,14 +248,20 @@ def send_sos2():
     image = request.files['image']
     data = request.json
     username = data['username']
+    
+    # Convert image to binary
+    image_binary = BytesIO()
+    image.save(image_binary, format=image.format)
+    image_data = base64.b64encode(image_binary.getvalue()).decode('utf-8')
+    
     new_message = {
-        "message": image,
+        "message": image_data,
         "username": username,
         "type": "image"
     }
+    
     messages_collection.insert_one(new_message)
     return jsonify({"status": "SOS sent!"})
-
 # Route for user registration
 @app.route('/register', methods=['GET', 'POST'])
 def register():
