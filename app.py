@@ -9,6 +9,14 @@ import logging
 from datetime import timedelta
 from werkzeug.utils import secure_filename
 
+import cv2
+from tensorflow.keras.models import load_model  # type: ignore
+from tensorflow.keras.preprocessing import image  # type: ignore
+from facenet_pytorch import MTCNN
+import torch
+import gc
+import tensorflow as tf
+
 # Initialize the app and setup CORS
 app = Flask(__name__)
 CORS(app, supports_credentials=True)
@@ -51,6 +59,90 @@ messages_collection = db['messages']
 # Ensure the 'uploads' directory exists
 if not os.path.exists('uploads'):
     os.makedirs('uploads')
+
+
+def initialize_interpreter():
+    interpreter = tf.lite.Interpreter(model_path="my_gender_final2.tflite")
+    interpreter.allocate_tensors()
+    return interpreter
+
+# MTCNN for face detection
+mtcnn = MTCNN(keep_all=True)
+
+# Modify the gender prediction code using TensorFlow Lite
+def predict_gender(interpreter, resized_face):
+    # Preprocess the face image
+    test_img = cv2.resize(resized_face, (64, 64))
+    test_img = np.expand_dims(test_img, axis=0).astype(np.float32)
+
+    # Set the input tensor
+    input_details = interpreter.get_input_details()
+    output_details = interpreter.get_output_details()
+    interpreter.set_tensor(input_details[0]['index'], test_img)
+
+    # Run the inference
+    interpreter.invoke()
+
+    # Get the prediction
+    output_data = interpreter.get_tensor(output_details[0]['index'])
+    return output_data
+
+@app.route('/upload_image', methods=['POST'])
+def upload_image():
+    if 'image' not in request.files:
+        return jsonify({"error": "No image uploaded"}), 400
+
+    file = request.files['image']
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+    file.save(filepath)
+
+    img = cv2.imread(filepath)
+    if img is not None:
+        if img.shape[0] > 1024 or img.shape[1] > 1024:
+            img = cv2.resize(img, (1024, 1024))
+
+        # Detect faces using MTCNN
+        boxes, _ = mtcnn.detect(img)
+
+        if boxes is not None:
+            count_male = 0
+            count_female = 0
+
+            # Initialize the TensorFlow Lite interpreter per request (thread-safe)
+            interpreter = initialize_interpreter()
+
+            for box in boxes:
+                x_min, y_min, x_max, y_max = [int(b) for b in box]
+                cropped_face = img[y_min:y_max, x_min:x_max]
+
+                # Predict gender using TensorFlow Lite
+                y_hat = predict_gender(interpreter, cropped_face)
+
+                if y_hat[0][0] > 0.5:
+                    count_male += 1
+                else:
+                    count_female += 1
+
+            total_faces = count_male + count_female
+            print(f'number of male:{count_male}\nnumber of female {count_female}\ntotal:{total_faces}')
+            logger.info(f'number of male:{count_male}\nnumber of female {count_female}\ntotal:{total_faces}')
+    
+
+            # Clean up interpreter and memory after each request
+            interpreter = None
+            gc.collect()
+
+            return jsonify({
+                'num_males': count_male,
+                'num_females': count_female,
+                'total_faces': total_faces
+            })
+
+        else:
+            return jsonify({"message": "No faces detected in the image."}), 200
+
+    else:
+        return jsonify({"error": "Failed to load image."}), 400
 
 @app.route('/community')
 def community():
