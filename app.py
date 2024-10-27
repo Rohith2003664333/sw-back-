@@ -230,6 +230,21 @@ def send_sos():
     logger.info(f"SOS message sent by {username}: {sos_message}")
     return jsonify({"status": "SOS sent!"})
 
+  
+@app.route('/sendSOS2', methods=['POST'])
+ def send_sos2():
+     if 'image' not in request.files:
+        return jsonify({"error": "No image uploaded"}), 400
+     image=request.files['image']
+     data=request.json
+     username=data['username']
+     new_message = {
+         "message":image,
+         "username": username,
+         "type":"image"
+    }
+    messages_collection.insert_one(new_message)
+    return jsonify({"status":"SOS sent!"})
 # Home page route
 @app.route('/index')
 def index():
