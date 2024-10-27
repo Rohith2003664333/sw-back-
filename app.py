@@ -8,10 +8,9 @@ from pymongo import MongoClient
 import logging
 from datetime import timedelta
 from werkzeug.utils import secure_filename
-
 import cv2
+import numpy as np  # Importing numpy for array manipulation
 from tensorflow.keras.models import load_model  # type: ignore
-from tensorflow.keras.preprocessing import image  # type: ignore
 from facenet_pytorch import MTCNN
 import torch
 import gc
@@ -60,7 +59,6 @@ messages_collection = db['messages']
 if not os.path.exists('uploads'):
     os.makedirs('uploads')
 
-
 def initialize_interpreter():
     interpreter = tf.lite.Interpreter(model_path="my_gender_final2.tflite")
     interpreter.allocate_tensors()
@@ -93,11 +91,12 @@ def upload_image():
         return jsonify({"error": "No image uploaded"}), 400
 
     file = request.files['image']
-    filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+    filepath = os.path.join('uploads', secure_filename(file.filename))  # Save to uploads folder
     file.save(filepath)
 
     img = cv2.imread(filepath)
     if img is not None:
+        # Resize if dimensions are larger than 1024
         if img.shape[0] > 1024 or img.shape[1] > 1024:
             img = cv2.resize(img, (1024, 1024))
 
@@ -124,9 +123,7 @@ def upload_image():
                     count_female += 1
 
             total_faces = count_male + count_female
-            print(f'number of male:{count_male}\nnumber of female {count_female}\ntotal:{total_faces}')
-            logger.info(f'number of male:{count_male}\nnumber of female {count_female}\ntotal:{total_faces}')
-    
+            logger.info(f'number of male: {count_male}, number of female: {count_female}, total: {total_faces}')
 
             # Clean up interpreter and memory after each request
             interpreter = None
@@ -256,121 +253,42 @@ def register():
             flash('Email already exists! Please log in.')
             return jsonify({'success': True, 'message': 'Email already exists! Please log in.'})
 
-        # Insert new user into MongoDB
+        # Create new user
         users_collection.insert_one({
             'username': username,
             'mobile': mobile,
             'email': email,
-            'password': password  # Plain text for now as requested
+            'password': password
         })
+        flash('Registration successful! You can now log in.')
+        return redirect('login')
 
-        flash('Registration successful! Please log in.')
-        return jsonify({'success': True, 'message': 'Registration successful! Please log in.'})
-
-    return render_template('registration.html')
+    return render_template('register.html')
 
 # Route for user login
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        email = request.form['email']
-        password = request.form['password']
+        email = request.form.get('email')
+        password = request.form.get('password')
 
-        # Check if user exists
-        user = users_collection.find_one({'email': email})
+        user = users_collection.find_one({'email': email, 'password': password})
 
-        if user and password == user['password']:
+        if user:
             session['username'] = user['username']
-            session['mobile'] = user['mobile']
-            session.permanent = True  # Set session as permanent
-            logger.info(f"User {user['username']} logged in successfully.")
-            return jsonify({'success': True, 'username': user['username'], 'mobile': user['mobile']})
-        else:
-            return jsonify({'success': False, 'message': 'Invalid credentials!'})
+            flash('Login successful!')
+            return redirect('index')
+
+        flash('Invalid email or password!')
 
     return render_template('login.html')
 
-# Logout route to clear the session
-@app.route('/logout', methods=['POST', 'GET'])
+# Route to log out the user
+@app.route('/logout', methods=['GET'])
 def logout():
-    username = session.get('username', 'Guest')
-    session.clear()  # Clear the session
-    logger.info(f"User {username} logged out.")
-    return redirect(url_for('index'))
-
-@app.route('/nearestPoliceStation', methods=['POST'])
-def nearest_police_station():
-    data = request.get_json()
-    latitude = data.get('latitude')
-    longitude = data.get('longitude')
-
-    # Predict the nearest police station using the trained model
-    try:
-        nearest_police_station.nearest_station = en.inverse_transform(cls.predict([[latitude, longitude]]))
-        contact_number = df1.loc[df1['Police_station_name'].str.contains(nearest_police_station.nearest_station[0], case=False, na=False), 'phone_number'].values[0]
-        n = contact_number.replace('-', '')  # Clean number
-        return jsonify({
-            'police_station': nearest_police_station.nearest_station[0],
-            'contact_number': n  # Ensure you return the cleaned number
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)})
-
-@app.route('/distanceP', methods=['POST'])
-def distance_p():
-    data = request.get_json()
-    lat1 = data.get('latitude')
-    lon1 = data.get('longitude')
-    nearest_station = en.inverse_transform(cls.predict([[lat1, lon1]]))[0]
-    lat1 = float(lat1)
-    lon1 = float(lon1)
-
-    # Get the nearest station name and location
-    station_data = df1[df1['Police_station_name'].str.contains(nearest_station, case=False, na=False)]
-
-    lat2 = station_data['latitude'].values[0]
-    lon2 = station_data['longitude'].values[0]
-
-    lat1, lon1 = math.radians(lat1), math.radians(lon1)
-    lat2, lon2 = math.radians(lat2), math.radians(lon2)
-
-    # Haversine formula
-    dlat = lat2 - lat1
-    dlon = lon2 - lon1
-
-    a = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-
-    R = 6371000  # Earth's radius in meters
-    distance = (R * c) / 1000
-    distance = round(distance, 2)
-
-    return jsonify({'police_distance': distance})
-
-@app.route('/emergency', methods=['POST'])
-def emergency():
-    data = request.get_json()
-    latitude = data.get('latitude')
-    longitude = data.get('longitude')
-    address = data.get('address')
-
-    # Log received location and address
-    logger.info(f'Received emergency location: Latitude {latitude}, Longitude {longitude}, Address {address}')
-
-    return jsonify({'status': 'success', 'latitude': latitude, 'longitude': longitude, 'address': address})
-
-@app.route('/getCrimeAlert', methods=['GET'])
-def get_crime_alert():
-    city = request.args.get('city')
-    crime_alert = 'low'  # Default value
-    for i in range(len(df2)):
-        if city.lower() in df2['registeration_circles'][i].lower():
-            crime_alert = df2['indicator'][i]
-            break
-    return jsonify({'alert': crime_alert})
-
-# Additional emergency and utility routes (trimmed for brevity)
+    session.pop('username', None)
+    flash('You have been logged out.')
+    return redirect('login')
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(debug=True, host='0.0.0.0', port=5000)
