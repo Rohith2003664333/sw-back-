@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session, send_from_directory
+from flask import Flask, render_template, request, jsonify, session
 from flask_cors import CORS
 import joblib
 import pandas as pd
@@ -9,10 +9,8 @@ import logging
 from datetime import timedelta
 from werkzeug.utils import secure_filename
 import cv2
-import numpy as np  # Importing numpy for array manipulation
+import numpy as np
 from tensorflow.keras.models import load_model  # type: ignore
-from facenet_pytorch import MTCNN
-import torch
 import gc
 import tensorflow as tf
 
@@ -56,17 +54,18 @@ users_collection = db['users']
 messages_collection = db['messages']
 
 # Setup the uploads folder
-app.config['UPLOAD_FOLDER'] = 'uploads'  # Define the uploads folder path
+app.config['UPLOAD_FOLDER'] = 'uploads'
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
 
+# Initialize the TensorFlow Lite interpreter for gender prediction
 def initialize_interpreter():
     interpreter = tf.lite.Interpreter(model_path="my_gender_final2.tflite")
     interpreter.allocate_tensors()
     return interpreter
 
-# MTCNN for face detection
-mtcnn = MTCNN(keep_all=True)
+# Load Haar Cascade classifier for face detection
+face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 
 # Modify the gender prediction code using TensorFlow Lite
 def predict_gender(interpreter, resized_face):
@@ -92,28 +91,27 @@ def upload_image():
         return jsonify({"error": "No image uploaded"}), 400
 
     file = request.files['image']
-    filepath = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(file.filename))  # Save to uploads folder
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(file.filename))
     file.save(filepath)
 
     img = cv2.imread(filepath)
     if img is not None:
-        # Resize if dimensions are larger than 1024
         if img.shape[0] > 1024 or img.shape[1] > 1024:
             img = cv2.resize(img, (1024, 1024))
 
-        # Detect faces using MTCNN
-        boxes, _ = mtcnn.detect(img)
+        # Detect faces using Haar Cascade
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
 
-        if boxes is not None:
+        if len(faces) > 0:
             count_male = 0
             count_female = 0
 
             # Initialize the TensorFlow Lite interpreter per request (thread-safe)
             interpreter = initialize_interpreter()
 
-            for box in boxes:
-                x_min, y_min, x_max, y_max = [int(b) for b in box]
-                cropped_face = img[y_min:y_max, x_min:x_max]
+            for (x, y, w, h) in faces:
+                cropped_face = img[y:y+h, x:x+w]
 
                 # Predict gender using TensorFlow Lite
                 y_hat = predict_gender(interpreter, cropped_face)
@@ -141,6 +139,7 @@ def upload_image():
 
     else:
         return jsonify({"error": "Failed to load image."}), 400
+
 
 
 @app.route('/community')
