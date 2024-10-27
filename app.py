@@ -243,25 +243,36 @@ def index():
 
 @app.route('/sendSOS2', methods=['POST'])
 def send_sos2():
+    # Check if image is included in the request
     if 'image' not in request.files:
         return jsonify({"error": "No image uploaded"}), 400
+
+    # Get image and username from the request
     image = request.files['image']
-    data = request.json
-    username = data['username']
+    username = request.form.get('username', 'Guest')
     
-    # Convert image to binary
+    # Set a secure path for saving the file on disk
+    filename = secure_filename(image.filename)
+    save_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    image.save(save_path)  # Save image to the specified path
+
+    # Optionally, convert image to binary for MongoDB storage
     image_binary = BytesIO()
     image.save(image_binary, format=image.format)
     image_data = base64.b64encode(image_binary.getvalue()).decode('utf-8')
     
+    # Create the message entry for MongoDB
     new_message = {
         "message": image_data,
         "username": username,
         "type": "image"
     }
     
-    messages_collection.insert_one(new_message)
-    return jsonify({"status": "SOS sent!"})
+    messages_collection.insert_one(new_message)  # Store in MongoDB
+    logger.info(f"SOS image message sent by {username} and saved at {save_path}")
+    
+    return jsonify({"status": "SOS sent with image!"})
+
 # Route for user registration
 @app.route('/register', methods=['GET', 'POST'])
 def register():
