@@ -231,25 +231,27 @@ def send_sos():
     return jsonify({"status": "SOS sent!"})
 
   
-@app.route('/sendSOS2', methods=['POST'])
- def send_sos2():
-     if 'image' not in request.files:
-        return jsonify({"error": "No image uploaded"}), 400
-     image=request.files['image']
-     data=request.json
-     username=data['username']
-     new_message = {
-         "message":image,
-         "username": username,
-         "type":"image"
-    }
-    messages_collection.insert_one(new_message)
-    return jsonify({"status":"SOS sent!"})
+
 # Home page route
 @app.route('/index')
 def index():
     username = session.get('username', 'Guest')
     return render_template('index.html', username=username)
+
+@app.route('/sendSOS2', methods=['POST'])
+def send_sos2():
+    if 'image' not in request.files:
+        return jsonify({"error": "No image uploaded"}), 400
+    image = request.files['image']
+    data = request.json
+    username = data['username']
+    new_message = {
+        "message": image,
+        "username": username,
+        "type": "image"
+    }
+    messages_collection.insert_one(new_message)
+    return jsonify({"status": "SOS sent!"})
 
 # Route for user registration
 @app.route('/register', methods=['GET', 'POST'])
