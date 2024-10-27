@@ -55,9 +55,10 @@ db = client['swaraksha']
 users_collection = db['users']
 messages_collection = db['messages']
 
-# Ensure the 'uploads' directory exists
-if not os.path.exists('uploads'):
-    os.makedirs('uploads')
+# Setup the uploads folder
+app.config['UPLOAD_FOLDER'] = 'uploads'  # Define the uploads folder path
+if not os.path.exists(app.config['UPLOAD_FOLDER']):
+    os.makedirs(app.config['UPLOAD_FOLDER'])
 
 def initialize_interpreter():
     interpreter = tf.lite.Interpreter(model_path="my_gender_final2.tflite")
@@ -91,7 +92,7 @@ def upload_image():
         return jsonify({"error": "No image uploaded"}), 400
 
     file = request.files['image']
-    filepath = os.path.join('uploads', secure_filename(file.filename))  # Save to uploads folder
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(file.filename))  # Save to uploads folder
     file.save(filepath)
 
     img = cv2.imread(filepath)
@@ -140,6 +141,7 @@ def upload_image():
 
     else:
         return jsonify({"error": "Failed to load image."}), 400
+
 
 @app.route('/community')
 def community():
