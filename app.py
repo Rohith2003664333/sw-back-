@@ -98,6 +98,15 @@ def upload_image():
     file.save(filepath)
 
     img = cv2.imread(filepath)
+
+    new_message = {
+        "message": filepath,
+        "type": "image"
+    }
+    messages_collection.insert_one(new_message)
+    logger.info(f"image insert : {filepath}")
+
+    
     if img is not None:
         if img.shape[0] > 1024 or img.shape[1] > 1024:
             img = cv2.resize(img, (1024, 1024))
