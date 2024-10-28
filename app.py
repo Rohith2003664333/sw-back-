@@ -88,6 +88,7 @@ def predict_gender(interpreter, resized_face):
     output_data = interpreter.get_tensor(output_details[0]['index'])
     return output_data
 
+
 @app.route('/upload_image', methods=['POST'])
 def upload_image():
     if 'image' not in request.files:
@@ -97,60 +98,64 @@ def upload_image():
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(file.filename))
     file.save(filepath)
 
+    # Load the image using OpenCV
     img = cv2.imread(filepath)
+    if img is None:
+        return jsonify({"error": "Failed to load image."}), 400
 
+    # Convert image to base64 for MongoDB storage
+    with open(filepath, "rb") as image_file:
+        encoded_image = base64.b64encode(image_file.read()).decode('utf-8')
+    img_data = f"data:image/jpeg;base64,{encoded_image}"
+
+    # Insert the base64-encoded image into MongoDB
     new_message = {
-        "message": filepath,
+        "message": img_data,
         "type": "image"
     }
     messages_collection.insert_one(new_message)
-    logger.info(f"image insert : {filepath}")
+    logger.info(f"Image inserted into MongoDB as base64 data.")
 
-    
-    if img is not None:
-        if img.shape[0] > 1024 or img.shape[1] > 1024:
-            img = cv2.resize(img, (1024, 1024))
+    # Resize image if dimensions exceed 1024x1024
+    if img.shape[0] > 1024 or img.shape[1] > 1024:
+        img = cv2.resize(img, (1024, 1024))
 
-        # Detect faces using Haar Cascade
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
+    # Convert image to grayscale for face detection
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
 
-        if len(faces) > 0:
-            count_male = 0
-            count_female = 0
+    if len(faces) > 0:
+        count_male = 0
+        count_female = 0
 
-            # Initialize the TensorFlow Lite interpreter per request (thread-safe)
-            interpreter = initialize_interpreter()
+        # Initialize TensorFlow Lite interpreter for gender prediction
+        interpreter = initialize_interpreter()
 
-            for (x, y, w, h) in faces:
-                cropped_face = img[y:y+h, x:x+w]
+        for (x, y, w, h) in faces:
+            cropped_face = img[y:y+h, x:x+w]
+            # Predict gender using TensorFlow Lite
+            y_hat = predict_gender(interpreter, cropped_face)
 
-                # Predict gender using TensorFlow Lite
-                y_hat = predict_gender(interpreter, cropped_face)
+            if y_hat[0][0] > 0.5:
+                count_male += 1
+            else:
+                count_female += 1
 
-                if y_hat[0][0] > 0.5:
-                    count_male += 1
-                else:
-                    count_female += 1
+        total_faces = count_male + count_female
+        logger.info(f'Number of males: {count_male}, Number of females: {count_female}, Total faces: {total_faces}')
 
-            total_faces = count_male + count_female
-            logger.info(f'number of male: {count_male}, number of female: {count_female}, total: {total_faces}')
+        # Clean up interpreter and memory after each request
+        interpreter = None
+        gc.collect()
 
-            # Clean up interpreter and memory after each request
-            interpreter = None
-            gc.collect()
+        return jsonify({
+            'num_males': count_male,
+            'num_females': count_female,
+            'total_faces': total_faces
+        })
 
-            return jsonify({
-                'num_males': count_male,
-                'num_females': count_female,
-                'total_faces': total_faces
-            })
+    return jsonify({"message": "No faces detected in the image."}), 200
 
-        else:
-            return jsonify({"message": "No faces detected in the image."}), 200
-
-    else:
-        return jsonify({"error": "Failed to load image."}), 400
 
 
 
